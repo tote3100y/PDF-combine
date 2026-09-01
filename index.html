@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF 가로 스크롤 리더</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="theme-color" content="#0e0f13">
+<meta name="mobile-web-app-capable" content="yes">
+<script src="./lib/pdf.min.js"></script>
+<script src="./lib/pdf.worker.min.js"></script>
+<script src="./lib/pdf-lib.js"></script>
+<style>
+  :root, [data-theme="dark"] {
+    --bg: #0e0f13; --panel: #171a21; --panel2: #1e2230;
+    --text: #e8eaf0; --sub: #9aa3b5; --accent: #4f8cff; --accent2: #7aa5ff; --border: #2a2f3d;
+    --warn: #ff8484;
+    color-scheme: dark;
+  }
+  [data-theme="light"] {
+    --bg: #f4f5f9; --panel: #ffffff; --panel2: #e9ebf3;
+    --text: #1d2233; --sub: #5c6478; --accent: #2f6fe4; --accent2: #3d74f0; --border: #d3d8e6;
+    --warn: #d6455d;
+    color-scheme: light;
+  }
+  #themeToggle { position: fixed; top: 14px; right: 14px; z-index: 30; width: 40px; height: 40px;
+    border-radius: 12px; border: 1px solid var(--border); background: var(--panel);
+    font-size: 18px; color: var(--text); line-height: 1; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
+  #themeToggle:hover { border-color: var(--accent); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+  button { font-family: inherit; cursor: pointer; }
+  .hidden { display: none !important; }
+
+  /* ---------- 홈 ---------- */
+  #home { max-width: 760px; margin: 0 auto; padding: 44px 20px 90px; }
+  #home h1 { font-size: 28px; margin: 0 0 10px; }
+  .sub { color: var(--sub); margin: 0; line-height: 1.65; }
+  #dropzone { margin-top: 26px; border: 2px dashed var(--border); border-radius: 16px;
+    padding: 46px 20px; text-align: center; transition: all .15s; background: var(--panel); }
+  #dropzone.drag { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); transform: scale(1.01); }
+  .dz-icon { font-size: 40px; margin-bottom: 10px; }
+  .btnrow { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  .btn { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    padding: 10px 18px; border-radius: 10px; font-size: 14px; transition: border-color .12s; }
+  .btn:hover:not(:disabled) { border-color: var(--accent); }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn.primary { background: linear-gradient(135deg, #3d74f0, #5b8cff); border-color: transparent; font-weight: 600; }
+  .btn.big { padding: 14px 30px; font-size: 16px; border-radius: 12px; }
+  #folderList { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .sortrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 18px; }
+  .sortnote { font-size: 12.5px; color: var(--sub); line-height: 1.5; }
+  .btn.mini { padding: 6px 12px; font-size: 12.5px; border-radius: 8px; flex: none; }
+  .empty { color: var(--sub); text-align: center; padding: 22px; border: 1px solid var(--border);
+    border-radius: 12px; background: var(--panel); font-size: 14px; }
+  .frow { display: flex; align-items: center; gap: 10px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; }
+  .fidx { width: 26px; height: 26px; border-radius: 8px; background: var(--panel2); flex: none;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: var(--accent2); }
+  .fname { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fmeta { color: var(--sub); font-size: 13px; white-space: nowrap; }
+  .warn { color: var(--warn); font-size: 12px; white-space: nowrap; }
+  .fgrow { display: flex; gap: 4px; }
+  .sbtn { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel2); color: var(--text); font-size: 13px; line-height: 1; }
+  .sbtn:hover { border-color: var(--accent); }
+  .msg { color: var(--warn); margin-top: 12px; min-height: 18px; font-size: 14px; }
+  .tips { margin-top: 30px; border-top: 1px solid var(--border); padding-top: 18px; font-size: 13px; color: var(--sub); line-height: 1.8; }
+
+  /* ---------- 리더 ---------- */
+  #readerWrap { position: fixed; inset: 0; background: #0a0b0f; }
+  #reader { position: absolute; inset: 0; overflow: auto; cursor: grab; }
+  #reader:active { cursor: grabbing; }
+  #reader::-webkit-scrollbar { height: 10px; width: 10px; }
+  #reader::-webkit-scrollbar-track { background: transparent; }
+  #reader::-webkit-scrollbar-thumb { background: #2c3242; border-radius: 99px; }
+  #reader::-webkit-scrollbar-thumb:hover { background: #3a4155; }
+  .strip { display: flex; align-items: stretch; width: max-content; }
+  .slot { position: relative; flex: none; background: #0a0b0f; }
+  .slot.loading { background: linear-gradient(100deg, #111319 40%, #181c26 50%, #111319 60%);
+    background-size: 200% 100%; animation: shim 1.4s linear infinite; }
+  @keyframes shim { to { background-position: -200% 0; } }
+  .slot.error { display: flex; align-items: center; justify-content: center;
+    color: #ff8484; font-size: 14px; background: #141018; }
+  .slot.error::after { content: "⚠ 이 페이지 로드 실패"; }
+  .slot canvas { width: 100%; height: 100%; display: block; }
+  .plabel { position: absolute; top: 8px; left: 8px; font-size: 11px; letter-spacing: .02em;
+    background: rgba(0,0,0,.55); color: #e8eaf0; padding: 3px 9px; border-radius: 999px;
+    opacity: 0; transition: opacity .15s; pointer-events: none; white-space: nowrap; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; }
+  .slot:hover .plabel, .slot.current .plabel { opacity: 1; }
+  #progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 20; background: rgba(255,255,255,.06); }
+  #progressBar { height: 100%; width: 0; background: linear-gradient(90deg, #3d74f0, #7aa5ff); transition: width .15s; }
+  #ctrlbar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 20;
+    display: flex; align-items: center; gap: 4px; background: rgba(18,20,28,.88);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border); border-radius: 14px; padding: 6px 10px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.5); max-width: calc(100vw - 20px); }
+  .cbtn { min-width: 34px; height: 34px; padding: 0 8px; border-radius: 9px; border: 1px solid transparent;
+    background: transparent; color: var(--text); font-size: 15px; white-space: nowrap; }
+  .cbtn:hover { background: var(--panel2); border-color: var(--border); }
+  .cinfo { font-size: 13px; color: var(--sub); padding: 0 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #fileInfo { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; flex: none; }
+</style>
+</head>
+<body>
+
+<!-- ===== 홈 화면 ===== -->
+<div id="home" class="view">
+  <button id="themeToggle" title="테마 전환 (다크/라이트)">🌙</button>
+  <h1>📚 PDF 가로 스크롤 리더</h1>
+  <p class="sub">여러 폴더의 <b>PDF + 이미지(JPG/PNG 등)</b>를 <b>추가 순서대로 합쳐서</b> 한 줄로 이어 붙이고,<br>좌우로 스크롤해서 만화처럼 볼 수 있어요.</p>
+
+  <div id="dropzone">
+    <div class="dz-icon">📁</div>
+    <div><b>폴더를 여기에 드래그&amp;드롭</b> &nbsp;또는&nbsp; 아래 버튼으로 추가</div>
+    <div class="sub" style="margin-top:8px">추천: 폴더 여러 개를 한꺼번에 드래그&드롭 (이름순으로 자동 정렬)</div>
+  </div>
+
+  <div class="btnrow">
+    <button id="btnAddFolder" class="btn primary">📁 폴더 추가</button>
+    <button id="btnAddFiles" class="btn">📄 PDF / 이미지 파일 추가</button>
+    <input type="file" id="folderInput" webkitdirectory multiple hidden>
+    <input type="file" id="fileInput" accept="application/pdf,image/*,.pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.avif" multiple hidden>
+  </div>
+
+  <div class="sortrow">
+    <span id="sortNote" class="sortnote"></span>
+    <button id="btnResort" class="btn mini" type="button">↕ 이름순 정렬</button>
+  </div>
+  <div id="folderList"></div>
+
+  <div id="startRow" class="btnrow hidden">
+    <button id="btnStart" class="btn primary big">▶ 읽기 시작</button>
+    <button id="btnExport" class="btn big" title="모든 페이지를 하나의 PDF로 (페이지 이미지 변환 방식 — 독서 화면과 동일한 표시)">⬇ 하나로 합친 PDF 받기</button>
+  </div>
+  <div class="sub" style="margin-top:8px; font-size:12px">※ 합친 PDF는 각 페이지를 이미지로 변환해 만들어요 — 독서 화면과 똑같이 표시되지만, 텍스트 선택/복사는 불가하고 용량이 커질 수 있어요</div>
+  <div id="homeMsg" class="msg"></div>
+
+  <div class="tips">
+    💡 <b>사용법</b><br>
+    1. <b>폴더 여러 개를 한꺼번에 드래그&드롭</b> (추천)하거나 📁 폴더 추가 버튼 사용 — 폴더는 <b>이름순으로 자동 정렬</b>됩니다 (숫자순: 폴더1 → 폴더2 → 폴더10), ↑↓로 미세 조정 가능<br>
+    &nbsp;&nbsp;&nbsp;• 각 폴더에 같은 이름 파일(예: 1.pdf, 2.pdf)이 있어도 문제없어요 — <b>폴더1 전체 → 폴더2 전체</b> 순서가 되고, 페이지 좌측 라벨에 폴더명이 표시됩니다<br>
+    2. 폴더 안의 PDF·이미지는 숫자 순으로 섞여 정렬돼요: 1 → 2 → … → 10 (1.jpg, 1.pdf 같은 건 번호 → 확장자 순)<br>
+    3. 읽기 화면에서: 마우스 휠·트랙패드로 좌우 스크롤 / <b>← →</b> 방향키 / 화면 클릭(오른쪽 4/5=다음, 왼쪽 1/5=이전) / <b>+</b> <b>-</b> 키로 확대 축소
+  </div>
+</div>
+
+<!-- ===== 리더 화면 ===== -->
+<div id="readerWrap" class="view hidden">
+  <div id="reader"></div>
+  <div id="progress"><div id="progressBar"></div></div>
+  <div id="ctrlbar">
+    <button id="btnBack" class="cbtn" title="폴더 선택 화면으로">← 폴더</button>
+    <div class="sep"></div>
+    <button id="btnPrev" class="cbtn" title="이전 (←)">◀</button>
+    <div id="pageInfo" class="cinfo">– / –</div>
+    <button id="btnNext" class="cbtn" title="다음 (→)">▶</button>
+    <div id="fileInfo" class="cinfo"></div>
+    <div class="sep"></div>
+    <button id="btnZoomOut" class="cbtn" title="축소 (-)">−</button>
+    <div id="zoomInfo" class="cinfo">100%</div>
+    <button id="btnZoomIn" class="cbtn" title="확대 (+)">＋</button>
+    <div class="sep"></div>
+    <button id="btnExportR" class="cbtn" title="모든 페이지를 하나의 PDF로 (페이지 이미지 변환 방식 — 독서 화면과 동일한 표시)">⬇ 합치기</button>
+    <button id="btnFull" class="cbtn" title="전체화면">⛶</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= 기본 설정 ================= */
+pdfjsLib.GlobalWorkerOptions.workerSrc = './lib/pdf.worker.min.js';
+
+const state = {
+  folders: [],   // {id, name, files:[{file, rel}]}  (추가 순서 = 읽기 순서)
+  pages: [],     // {kind:'pdf'|'image', ..., slot, canvas, ctx, rendered, queued, gen}
+  zoom: 1,
+  current: 0,
+  reading: false,
+  folderSeq: 0,
+  autoSort: true,
+};
+
+const $ = s => document.querySelector(s);
+const readerEl = $('#reader');
+const DPR = () => Math.min(window.devicePixelRatio || 1, 2);
+
+/* ---------- 테마 (기본: 다크) ---------- */
+(function () {
+  const btn = $('#themeToggle');
+  function apply(t) {
+    document.documentElement.dataset.theme = t;
+    btn.textContent = t === 'dark' ? '🌙' : '☀️';
+    try { localStorage.setItem('pdfreader-theme', t); } catch (e) {}
+  }
+  let saved = null;
+  try { saved = localStorage.getItem('pdfreader-theme'); } catch (e) {}
+  apply(saved === 'light' ? 'light' : 'dark');
+  btn.onclick = () => apply(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+})();
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const tick = () => new Promise(r => setTimeout(r, 0));
+
+const isPdf = n => /\.pdf$/i.test(n);
+const isImage = n => /\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(n);
+const isMedia = n => isPdf(n) || isImage(n);
+
+/* 폴더 안 미디어 파일 숫자순 정렬 (1 → 2 → 10) */
+function sortedMedia(folder) {
+  return folder.files.filter(f => isMedia(f.file.name))
+    .sort((a, b) => a.file.name.localeCompare(b.file.name, 'ko', { numeric: true, sensitivity: 'base' }));
+}
+/* 폴더 추가 순서대로 펼쳐진 전체 미디어 목록 */
+function allMedia() {
+  const out = [];
+  for (const f of state.folders)
+    for (const item of sortedMedia(f))
+      out.push({ file: item.file, rel: item.rel, folderName: f.name, isPdf: isPdf(item.file.name) });
+  return out;
+}
+function downloadBlob(name, blob) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+/* 이미지 원본 크기(픽셀)만 빠르게 얻기 */
+function imageDims(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    let done = false;
+    const fin = (fn, v) => { if (done) return; done = true; URL.revokeObjectURL(url); fn(v); };
+    img.onload = () => fin(res, { w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => fin(rej, new Error('이미지 로드 실패'));
+    setTimeout(() => fin(rej, new Error('이미지 로드 시간 초과')), 15000);
+    img.src = url;
+  });
+}
+
+/* ================= 폴더 추가 ================= */
+$('#btnAddFolder').onclick = () => {
+  /* Chrome/Edge: File System Access API(원생 폴더 선택기)가 가장 신뢰성 높음 */
+  if (window.showDirectoryPicker) pickDirectory();
+  else $('#folderInput').click();
+};
+$('#btnAddFiles').onclick  = () => $('#fileInput').click();
+$('#btnResort').onclick    = resortByname;
+
+async function pickDirectory() {
+  try {
+    const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+    const files = [];
+    await walkHandle(dirHandle, '', files);
+    addFolder(dirHandle.name, files);
+    if (!files.length) {
+      $('#homeMsg').textContent = '"' + dirHandle.name + '": 폴더 안에 파일이 0개예요.';
+    }
+    console.log('[PDF 리더] showDirectoryPicker:', dirHandle.name, '→', files.length, 'files');
+  } catch (err) {
+    if (err && err.name === 'AbortError') return; /* 취소 */
+    console.warn('[PDF 리더] showDirectoryPicker 실패 → 웹폴더 선택기로 폴백:', err);
+    $('#folderInput').click();
+  }
+}
+async function walkHandle(dir, prefix, out) {
+  for await (const [name, handle] of dir.entries()) {
+    if (handle.kind === 'file') {
+      const file = await handle.getFile();
+      out.push({ file, rel: prefix + name });
+    } else if (handle.kind === 'directory') {
+      await walkHandle(handle, prefix + name + '/', out);
+    }
+  }
+}
+
+$('#folderInput').addEventListener('change', e => {
+  const files = [...e.target.files];
+  if (!files.length) return;
+  const groups = new Map();
+  for (const f of files) {
+    const parts = (f.webkitRelativePath || f.name).split('/');
+    const top = parts[0] || f.name;
+    const rel = parts.length > 1 ? parts.slice(1).join('/') : f.name;
+    if (!groups.has(top)) groups.set(top, []);
+    groups.get(top).push({ file: f, rel });
+  }
+  for (const [name, fs] of groups) addFolder(name, fs);
+  e.target.value = '';
+});
+
+$('#fileInput').addEventListener('change', e => {
+  const fs = [...e.target.files].map(f => ({ file: f, rel: f.name }));
+  if (fs.length) addFolder('(단독 파일)', fs);
+  e.target.value = '';
+});
+
+/* 추가 순서 대신 폴더명 숫자순(폴더1 → 폴더2 → 폴더10)으로 자동 삽입 */
+function cmpFolderName(a, b) {
+  return a.localeCompare(b, 'ko', { numeric: true, sensitivity: 'base' });
+}
+function addFolder(name, files) {
+  const ex = state.folders.find(f => f.name === name);
+  if (ex) {
+    for (const f of files) if (!ex.files.some(x => x.rel === f.rel)) ex.files.push(f);
+  } else {
+    const entry = { id: ++state.folderSeq, name, files };
+    if (state.autoSort) {
+      let idx = state.folders.length;
+      for (let i = 0; i < state.folders.length; i++) {
+        if (cmpFolderName(state.folders[i].name, name) > 0) { idx = i; break; }
+      }
+      state.folders.splice(idx, 0, entry);
+    } else {
+      state.folders.push(entry);
+    }
+  }
+  renderFolderList();
+}
+function resortByname() {
+  state.folders.sort((a, b) => cmpFolderName(a.name, b.name));
+  state.autoSort = true;
+  renderFolderList();
+}
+
+/* ---------- 드래그 & 드롭 (폴더 지원) ---------- */
+const dz = $('#dropzone');
+let dragDepth = 0;
+['dragenter', 'dragover'].forEach(ev => {
+  window.addEventListener(ev, e => {
+    if (e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files')) {
+      e.preventDefault();
+      if (ev === 'dragenter') { dragDepth++; dz.classList.add('drag'); }
+    }
+  });
+});
+window.addEventListener('dragleave', () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) dz.classList.remove('drag');
+});
+window.addEventListener('drop', async e => {
+  e.preventDefault();
+  dragDepth = 0;
+  dz.classList.remove('drag');
+  const msg = $('#homeMsg');
+  msg.textContent = '';
+  try {
+    const items = [...e.dataTransfer.items];
+
+    /* ---- 1순위: FileSystemHandle (Chrome/Edge) — 폴더 읽기가 가장 확실한 API ---- */
+    const handles = await Promise.all(items.map(it =>
+      (it.getAsFileSystemHandle && typeof it.getAsFileSystemHandle === 'function')
+        ? Promise.resolve().then(() => it.getAsFileSystemHandle()).catch(() => null)
+        : Promise.resolve(null)
+    ));
+    const usable = handles.filter(Boolean);
+    console.log('[PDF 리더] 드롭 항목:', items.length, '개 → FileSystemHandle', usable.length, '개');
+
+    if (usable.length) {
+      const emptyNames = [];
+      const skipped = [];
+      const loose = [];
+      let added = 0;
+      for (const h of usable) {
+        if (h.kind === 'directory') {
+          const files = [];
+          await walkHandle(h, '', files);
+          if (files.length) { addFolder(h.name, files); added++; }
+          else emptyNames.push(h.name);
+        } else if (h.kind === 'file') {
+          const file = await h.getFile();
+          if (isMedia(file.name)) loose.push({ file, rel: file.name });
+          else skipped.push(file.name);
+        }
+      }
+      if (loose.length) addFolder('(단독 파일)', loose);
+      if (emptyNames.length) msg.textContent = '⚠ "' + emptyNames.join('", "') + '": 파일 0개 폴더예요.';
+      else if (skipped.length) msg.textContent = 'ℹ PDF/이미지가 아닌 파일은 무시했어요: ' + skipped.join(', ');
+      else if (added || loose.length) msg.textContent = '✅ ' + (added ? added + '개 폴더, ' : '') + (loose.length ? loose.length + '개 파일' : '') + ' 로딩 완료.';
+      return;
+    }
+
+    /* ---- 2순위: 레거시 webkitGetAsEntry (Firefox/Safari) ---- */
+    const entries = [];
+    for (const it of items) {
+      const en = it.webkitGetAsEntry && it.webkitGetAsEntry();
+      if (en) entries.push(en);
+    }
+    if (entries.length) {
+      const { groups, skipped } = await collectFromEntries(entries);
+      console.log('[PDF 리더] 드롭 엔트리(레거시):', entries.length, '개, 무시된 파일:', skipped);
+      const shortcutNames = skipped.filter(n => /\.(lnk|url|webloc|alias|desktop)$/i.test(n));
+      if (shortcutNames.length) {
+        msg.textContent = '⚠ 폴더가 아니라 바로가기 파일(' + shortcutNames.join(', ') + ')을 드롭하신 것 같아요. 실제 폴더를 드롭하거나, "📁 폴더 추가" 버튼을 쓰세요.';
+        return;
+      }
+      const emptyNames = [];
+      for (const g of groups) {
+        if (!g.files.length) { emptyNames.push(g.name); continue; }
+        addFolder(g.name, g.files);
+      }
+      if (emptyNames.length) {
+        msg.textContent = '⚠ "' + emptyNames.join('", "') + '": 내용(파일 0개)을 읽지 못했어요. "📁 폴더 추가" 버튼으로 넣어주세요. 그래도 안 되면 F12 → 콘솔의 [PDF 리더] 로그를 캡처해서 알려주세요.';
+      } else if (skipped.length) {
+        msg.textContent = 'ℹ PDF/이미지가 아닌 파일은 무시했어요: ' + skipped.join(', ');
+      }
+    } else {
+      const all = [...e.dataTransfer.files];
+      const fs = all.filter(f => isMedia(f.name)).map(f => ({ file: f, rel: f.name }));
+      if (fs.length) addFolder('(단독 파일)', fs);
+      else if (all.length) msg.textContent = '드롭한 파일은 PDF/이미지가 아니에요.';
+    }
+  } catch (err) {
+    msg.textContent = '⚠ 드롭한 폴더를 읽는 중 오류: ' + (err.message || err) + ' — "📁 폴더 추가" 버튼으로 다시 넣어주세요.';
+  }
+});
+
+function readAllEntries(reader) {
+  return new Promise((res, rej) => {
+    const all = [];
+    (function next() {
+      reader.readEntries(batch => {
+        if (!batch.length) return res(all);
+        all.push(...batch);
+        next();
+      }, err => rej(err || new Error('폴더 읽기 실패')));
+    })();
+  });
+}
+async function walkDir(dir, prefix, out) {
+  /* 드롭으로 읽은 폴더는 일시적 읽기 실패가 드물게 있음 → 최대 2회 재시도 */
+  let entries = null;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const got = await readAllEntries(dir.createReader());
+      if (got.length || attempt >= 2) { entries = got; break; }
+      console.warn('[PDF 리더] 폴더 "' + dir.name + '"에서 0개 파일 인식 — 재시도 (' + (attempt + 1) + '/2)');
+    } catch (err) {
+      if (attempt >= 2) throw err;
+      console.warn('[PDF 리더] 폴더 읽기 오류 — 재시도: ' + err);
+    }
+    await new Promise(r => setTimeout(r, 250));
+  }
+  for (const en of entries) {
+    if (en.isFile) {
+      const file = await new Promise((res, rej) => en.file(res, rej));
+      out.push({ file, rel: prefix + en.name });
+    } else if (en.isDirectory) {
+      await walkDir(en, prefix + en.name + '/', out);
+    }
+  }
+}
+async function collectFromEntries(entries) {
+  const result = [];
+  const skipped = [];
+  for (const en of entries) {
+    if (en.isFile) {
+      const file = await new Promise((res, rej) => en.file(res, rej));
+      if (isMedia(file.name)) result.push({ name: '(단독 파일)', files: [{ file, rel: file.name }] });
+      else skipped.push(file.name);
+    } else if (en.isDirectory) {
+      const files = [];
+      await walkDir(en, '', files);
+      result.push({ name: en.name, files });
+    }
+  }
+  const merged = [];
+  for (const g of result) {
+    const m = merged.find(x => x.name === g.name);
+    if (m) m.files.push(...g.files); else merged.push(g);
+  }
+  return { groups: merged, skipped };
+}
+
+/* ================= 폴더 목록 UI ================= */
+function renderFolderList() {
+  const el = $('#folderList');
+  $('#sortNote').textContent = state.autoSort
+    ? '🔁 새 폴더는 이름순(숫자순: 폴더1 → 폴더2 → 폴더10)으로 자동 정렬돼요 · ↑↓로 수동 조정 시 수동 모드로 전환'
+    : '✋ 수동 모드 — "↕ 이름순 정렬" 버튼으로 다시 자동 정렬할 수 있어요';
+  el.innerHTML = '';
+  if (!state.folders.length) {
+    el.innerHTML = '<div class="empty">아직 추가된 폴더가 없어요 — 폴더 여러 개를 한꺼번에 드래그&드롭하거나 버튼으로 추가하세요.</div>';
+  }
+  state.folders.forEach((f, i) => {
+    const media = sortedMedia(f);
+    const nPdf = media.filter(m => isPdf(m.file.name)).length;
+    const nImg = media.length - nPdf;
+    const row = document.createElement('div');
+    row.className = 'frow';
+    row.innerHTML =
+      '<span class="fidx">' + (i + 1) + '</span>' +
+      '<span class="fname" title="' + esc(f.name) + '">' + esc(f.name) + '</span>' +
+      '<span class="fmeta">' + nPdf + ' PDF · ' + nImg + ' 이미지 · ' + f.files.length + ' 파일</span>' +
+      (media.length ? '' : '<span class="warn">PDF/이미지 없음</span>') +
+      '<span class="fgrow">' +
+        '<button class="sbtn" data-act="up" title="위로">↑</button>' +
+        '<button class="sbtn" data-act="down" title="아래로">↓</button>' +
+        '<button class="sbtn" data-act="del" title="삭제">✕</button>' +
+      '</span>';
+    row.querySelector('[data-act=up]').onclick   = () => moveFolder(i, -1);
+    row.querySelector('[data-act=down]').onclick = () => moveFolder(i, 1);
+    row.querySelector('[data-act=del]').onclick  = () => { state.folders.splice(i, 1); renderFolderList(); };
+    el.appendChild(row);
+  });
+  $('#startRow').classList.toggle('hidden', !state.folders.length);
+}
+function moveFolder(i, d) {
+  const j = i + d;
+  if (j < 0 || j >= state.folders.length) return;
+  state.autoSort = false; /* 수동 조정부터는 수동 모드 */
+  const [f] = state.folders.splice(i, 1);
+  state.folders.splice(j, 0, f);
+  renderFolderList();
+}
+renderFolderList();
+
+/* ================= 미디어 로드 ================= */
+$('#btnStart').addEventListener('click', async () => {
+  const msg = $('#homeMsg');
+  msg.textContent = '';
+  const total = allMedia().length;
+  if (!total) { msg.textContent = 'PDF/이미지 파일이 하나도 없어요. 폴더 안에 PDF나 JPG 등이 있는지 확인하세요.'; return; }
+  const btn = $('#btnStart');
+  btn.disabled = true;
+  try {
+    await buildAll(btn);
+    enterReader();
+  } catch (err) {
+    msg.textContent = '로딩 실패: ' + (err.message || err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ 읽기 시작';
+  }
+});
+
+async function buildAll(btn) {
+  state.pages = [];
+  let done = 0;
+  for (const f of state.folders) {
+    for (const item of sortedMedia(f)) {
+      if (isPdf(item.file.name)) {
+        let doc;
+        try {
+          doc = await pdfjsLib.getDocument({ data: new Uint8Array(await item.file.arrayBuffer()) }).promise;
+        } catch (err) {
+          throw new Error('"' + f.name + '/' + item.file.name + '" 로딩 실패 (비밀번호가 걸린 PDF일 수 있어요)');
+        }
+        for (let i = 1; i <= doc.numPages; i++) {
+          const page = await doc.getPage(i);
+          const vp = page.getViewport({ scale: 1 });
+          state.pages.push({
+            kind: 'pdf', doc, page,
+            w: vp.width, h: vp.height,
+            label: f.name + '/' + item.file.name + ' · p' + i,
+            slot: null, canvas: null, ctx: null,
+            rendered: false, queued: false, gen: 0,
+          });
+          done++;
+          if (i === doc.numPages || done % 25 === 0) {
+            btn.textContent = '로딩 중… ' + done + '페이지';
+            await tick();
+          }
+        }
+      } else {
+        const url = URL.createObjectURL(item.file);
+        const img = new Image();
+        try {
+          await new Promise((res, rej) => {
+            img.onload = res;
+            img.onerror = () => rej(new Error('이미지 로드 실패'));
+            img.src = url;
+          });
+        } catch (err) {
+          URL.revokeObjectURL(url);
+          throw new Error('"' + f.name + '/' + item.file.name + '" ' + err.message);
+        }
+        state.pages.push({
+          kind: 'image', file: item.file, url, img,
+          w: img.naturalWidth, h: img.naturalHeight,
+          label: f.name + '/' + item.file.name,
+          slot: null, canvas: null, ctx: null,
+          rendered: false, queued: false, gen: 0,
+        });
+        done++;
+        if (done % 10 === 0) {
+          btn.textContent = '로딩 중… ' + done + '페이지';
+          await tick();
+        }
+      }
+    }
+  }
+  if (!state.pages.length) throw new Error('로딩된 페이지가 0개예요.');
+}
+
+/* ================= 리더 화면 ================= */
+function enterReader() {
+  const strip = document.createElement('div');
+  strip.className = 'strip';
+  state.pages.forEach((p, i) => {
+    const slot = document.createElement('div');
+    slot.className = 'slot loading';
+    slot.dataset.i = i;
+    const cv = document.createElement('canvas');
+    const label = document.createElement('div');
+    label.className = 'plabel';
+    label.textContent = p.label;
+    slot.append(cv, label);
+    p.slot = slot; p.canvas = cv; p.ctx = cv.getContext('2d');
+    strip.appendChild(slot);
+  });
+  readerEl.innerHTML = '';
+  readerEl.appendChild(strip);
+  $('#home').classList.add('hidden');
+  $('#readerWrap').classList.remove('hidden');
+  $('#themeToggle').classList.add('hidden');
+  state.reading = true;
+  state.current = 0;
+  layout();
+  setupObserver();
+  updateCurrent();
+}
+
+/* 모든 슬롯 크기 설정 (zoom 반영) */
+function layout() {
+  const H = readerEl.clientHeight * state.zoom;
+  const strip = readerEl.querySelector('.strip');
+  if (strip) strip.style.height = Math.ceil(H) + 'px';
+  for (let i = 0; i < state.pages.length; i++) {
+    const p = state.pages[i];
+    p.slot.style.width = Math.ceil(H * p.w / p.h) + 'px';
+    if (p.rendered) {
+      p.rendered = false;
+      p.queued = false;
+      p.slot.classList.add('loading');
+      enqueue(p, i === state.current);
+    }
+  }
+}
+
+/* ---------- 지연 렌더링 큐 ---------- */
+let renderQueue = [];
+let renderingCount = 0;
+function enqueue(p, front) {
+  if (p.queued || p.rendered) return;
+  p.queued = true;
+  if (front) renderQueue.unshift(p); else renderQueue.push(p);
+  pump();
+}
+function pump() {
+  (async () => {
+    while (renderingCount < 4 && renderQueue.length) {
+      const p = renderQueue.shift();
+      p.queued = false;
+      renderingCount++;
+      await renderOne(p);
+      renderingCount--;
+    }
+  })();
+}
+async function renderOne(p) {
+  const gen = ++p.gen;
+  const H = readerEl.clientHeight * state.zoom;
+  const scale = (H / p.h) * DPR();
+  const cw = Math.ceil(p.w * scale);
+  const ch = Math.ceil(p.h * scale);
+  p.canvas.width = cw;
+  p.canvas.height = ch;
+  try {
+    if (p.kind === 'image') {
+      p.ctx.imageSmoothingEnabled = true;
+      p.ctx.imageSmoothingQuality = 'high';
+      p.ctx.drawImage(p.img, 0, 0, cw, ch);
+    } else {
+      const vp = p.page.getViewport({ scale });
+      await p.page.render({ canvasContext: p.ctx, viewport: vp }).promise;
+    }
+    if (gen === p.gen) {
+      p.rendered = true;
+      p.slot.classList.remove('loading');
+    }
+  } catch (err) {
+    if (err && err.name === 'RenderingCancelledException') return;
+    p.slot.classList.remove('loading');
+    p.slot.classList.add('error');
+  }
+}
+
+let io = null;
+function setupObserver() {
+  if (io) io.disconnect();
+  io = new IntersectionObserver(entries => {
+    for (const en of entries) {
+      if (en.isIntersecting) {
+        const p = state.pages[+en.target.dataset.i];
+        if (p && !p.rendered) enqueue(p);
+      }
+    }
+  }, { root: readerEl, rootMargin: '0px 250%' });
+  for (const p of state.pages) io.observe(p.slot);
+  if (state.pages[0] && !state.pages[0].rendered) enqueue(state.pages[0], true);
+}
+
+/* ---------- 현재 페이지 추적 ---------- */
+let rafPending = false;
+readerEl.addEventListener('scroll', () => {
+  if (rafPending) return;
+  rafPending = true;
+  requestAnimationFrame(() => { rafPending = false; updateCurrent(); });
+});
+function updateCurrent() {
+  if (!state.pages.length) return;
+  const center = readerEl.scrollLeft + readerEl.clientWidth / 2;
+  let idx = 0, best = Infinity;
+  for (let i = 0; i < state.pages.length; i++) {
+    const s = state.pages[i].slot;
+    const d = Math.abs(s.offsetLeft + s.offsetWidth / 2 - center);
+    if (d < best) { best = d; idx = i; }
+  }
+  if (idx !== state.current) {
+    const old = state.pages[state.current];
+    if (old) old.slot.classList.remove('current');
+    state.current = idx;
+  }
+  const p = state.pages[idx];
+  p.slot.classList.add('current');
+  $('#pageInfo').textContent = (idx + 1) + ' / ' + state.pages.length;
+  $('#fileInfo').textContent = p.label;
+  $('#progressBar').style.width = ((idx + 1) / state.pages.length * 100) + '%';
+  document.title = 'p' + (idx + 1) + ' · ' + p.label;
+}
+
+/* ---------- 이동 / 줌 ---------- */
+function goTo(i) {
+  i = Math.max(0, Math.min(state.pages.length - 1, i));
+  const s = state.pages[i].slot;
+  readerEl.scrollTo({ left: s.offsetLeft, behavior: 'smooth' });
+}
+const next = n => goTo(state.current + (n || 1));
+const prev = n => goTo(state.current - (n || 1));
+
+function setZoom(z) {
+  state.zoom = Math.max(0.4, Math.min(4, Math.round(z * 100) / 100));
+  $('#zoomInfo').textContent = Math.round(state.zoom * 100) + '%';
+  if (!state.reading) return;
+  const cur = state.current;
+  layout();
+  requestAnimationFrame(() => {
+    readerEl.scrollTo({ left: state.pages[cur].slot.offsetLeft });
+    updateCurrent();
+  });
+}
+
+$('#btnNext').onclick = () => next();
+$('#btnPrev').onclick = () => prev();
+$('#btnZoomIn').onclick = () => setZoom(state.zoom + 0.25);
+$('#btnZoomOut').onclick = () => setZoom(state.zoom - 0.25);
+$('#btnFull').onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else if ($('#readerWrap').requestFullscreen) $('#readerWrap').requestFullscreen();
+};
+$('#btnBack').onclick = async () => {
+  state.reading = false;
+  if (io) io.disconnect();
+  const seen = new Set();
+  for (const p of state.pages) {
+    if (p.kind === 'image') {
+      if (p.url) URL.revokeObjectURL(p.url);
+      p.img = null;
+    } else if (!seen.has(p.doc)) {
+      seen.add(p.doc);
+      try { p.doc.destroy(); } catch (e) {}
+    }
+  }
+  state.pages = [];
+  renderQueue = [];
+  $('#readerWrap').classList.add('hidden');
+  $('#home').classList.remove('hidden');
+  $('#themeToggle').classList.remove('hidden');
+  document.title = 'PDF 가로 스크롤 리더';
+};
+
+/* 마우스 휠 → 가로 스크롤 */
+readerEl.addEventListener('wheel', e => {
+  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+    readerEl.scrollLeft += e.deltaY;
+    e.preventDefault();
+  }
+}, { passive: false });
+
+/* 클릭: 왼쪽 1/5 = 이전, 나머지 = 다음 */
+readerEl.addEventListener('click', e => {
+  const r = readerEl.getBoundingClientRect();
+  if ((e.clientX - r.left) / r.width < 0.18) prev(); else next();
+});
+
+/* 키보드 */
+window.addEventListener('keydown', e => {
+  if (!state.reading) return;
+  switch (e.key) {
+    case 'ArrowRight': case 'PageDown': case ' ': e.preventDefault(); next(); break;
+    case 'ArrowLeft': case 'PageUp': e.preventDefault(); prev(); break;
+    case 'Home': e.preventDefault(); goTo(0); break;
+    case 'End': e.preventDefault(); goTo(state.pages.length - 1); break;
+    case '+': case '=': setZoom(state.zoom + 0.25); break;
+    case '-': case '_': setZoom(state.zoom - 0.25); break;
+  }
+});
+
+/* 창 크기 변경 */
+let resizeT;
+window.addEventListener('resize', () => {
+  if (!state.reading) return;
+  clearTimeout(resizeT);
+  resizeT = setTimeout(() => {
+    const cur = state.current;
+    layout();
+    readerEl.scrollTo({ left: state.pages[cur].slot.offsetLeft });
+    updateCurrent();
+  }, 150);
+});
+
+/* ================= 합친 PDF 내보내기 (페이지 이미지 변환 방식) =================
+   암호화 PDF·특수 PDF에서도 흰 페이지가 나오지 않도록
+   독서 화면과 동일한 pdf.js 렌더링으로 각 페이지를 이미지화 */
+const MERGE_PX = 1600;    /* 렌더링 목표: 긴 변 (px) */
+const MERGE_PT_H = 842;   /* 세로 페이지 목표 높이 (pt, A4) */
+const MERGE_PT_W = 1190;  /* 가로 페이지 목표 너비 (pt, A4) */
+
+async function embedImage(doc, file) {
+  const name = file.name.toLowerCase();
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return doc.embedJpg(bytes);
+  if (name.endsWith('.png')) return doc.embedPng(bytes);
+  /* webp·gif·bmp 등 → canvas로 PNG 변환 */
+  const bmp = await createImageBitmap(file);
+  const cv = document.createElement('canvas');
+  cv.width = bmp.width;
+  cv.height = bmp.height;
+  cv.getContext('2d').drawImage(bmp, 0, 0);
+  if (bmp.close) bmp.close();
+  const b64 = cv.toDataURL('image/png').split(',')[1];
+  return doc.embedPng(atob(b64));
+}
+
+/* pdf.js 페이지 → JPEG 바이너리 (흰 배경 채움) */
+async function renderPdfPageJpeg(doc, pageNo) {
+  const page = await doc.getPage(pageNo);
+  const vp1 = page.getViewport({ scale: 1 });
+  const scale = MERGE_PX / Math.max(vp1.width, vp1.height);
+  const vp = page.getViewport({ scale });
+  const cw = Math.ceil(vp.width), ch = Math.ceil(vp.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cw, ch);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  const blob = await new Promise((res, rej) =>
+    canvas.toBlob(b => b ? res(b) : rej(new Error('이미지 인코딩 실패')), 'image/jpeg', 0.85));
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  canvas.width = 0; canvas.height = 0; /* 큰 캔버스 메모리 즉시 해제 */
+  return { bytes, w: cw, h: ch };
+}
+
+/* 균일한 크기(세로 842pt / 가로 1190pt)로 페이지 추가 */
+function addImagePage(out, image, w, h) {
+  const landscape = w > h;
+  const pw = landscape ? MERGE_PT_W : MERGE_PT_H * w / h;
+  const ph = landscape ? MERGE_PT_W * h / w : MERGE_PT_H;
+  const page = out.addPage([pw, ph]);
+  page.drawImage(image, { x: 0, y: 0, width: pw, height: ph });
+}
+
+/* 실패 사유를 사람이 읽기 쉽게 변환 */
+function humanizeExportError(err) {
+  if (!err) return '알 수 없는 오류';
+  if (err.name === 'PasswordException') return '비밀번호 걸린 PDF';
+  const m = String(err.message || err);
+  if (m.includes('이미지 로드 실패') || m.includes('이미지 로드 시간 초과'))
+    return '이미지 로드 실패 (HEIC 등 브라우저가 못 여는 형식일 수 있어요)';
+  if (/password/i.test(m)) return '비밀번호 걸린 PDF';
+  return m.length > 50 ? m.slice(0, 50) + '…' : m;
+}
+
+/* 실패 목록을 사유별로 묶어 요약 */
+function summarizeFailures(failures) {
+  const byReason = new Map();
+  for (const f of failures) {
+    if (!byReason.has(f.reason)) byReason.set(f.reason, []);
+    byReason.get(f.reason).push(f.name);
+  }
+  return [...byReason.entries()].map(([reason, names]) =>
+    '· ' + names.length + '개 ' + reason + ': ' + names.slice(0, 3).join(', ') + (names.length > 3 ? ' 외 ' + (names.length - 3) + '개' : '')
+  ).join('\n');
+}
+
+async function exportMerged(btn) {
+  if (!state.folders.length) return;
+  const old = btn.textContent;
+  btn.disabled = true;
+  let made = 0, failed = 0;
+  const failures = [];
+  let pwCache = null; /* 받은 비밀번호 재사용 (같은 폴더 PDF가 공유하는 경우) */
+  const askPw = async (fname) => {
+    if (pwCache) return pwCache;
+    const pw = prompt('"' + fname + '" 열기 위해 비밀번호가 필요해요:\n(같은 비밀번호를 쓰는 다른 파일도 함께 처리돼요)');
+    if (pw) pwCache = pw;
+    return pw;
+  };
+  try {
+    const list = allMedia();
+    if (!list.length) throw new Error('합칠 파일이 없어요.');
+    const out = await PDFLib.PDFDocument.create();
+
+    for (const it of list) {
+      const name = it.folderName + '/' + it.file.name;
+      try {
+        if (it.isPdf) {
+          let bytes = new Uint8Array(await it.file.arrayBuffer());
+          let doc;
+          try {
+            doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+          } catch (err) {
+            /* 비밀번호 PDF → 사용자에게 비밀번호 받아 재시도 (캐시 재사용) */
+            if (err.name === 'PasswordException') {
+              const pw = await askPw(it.file.name);
+              if (pw) {
+                bytes = new Uint8Array(await it.file.arrayBuffer());
+                doc = await pdfjsLib.getDocument({ data: bytes, password: pw }).promise;
+              } else throw err;
+            } else throw err;
+          }
+          /* 페이지 단위 try/catch — 한 페이지 실패해도 다른 페이지는 유지 */
+          let ok = 0, bad = 0, badErr = null;
+          try {
+            for (let i = 1; i <= doc.numPages; i++) {
+              try {
+                const r = await renderPdfPageJpeg(doc, i);
+                const image = await out.embedJpg(r.bytes);
+                addImagePage(out, image, r.w, r.h);
+                ok++;
+              } catch (err) {
+                bad++;
+                if (!badErr) badErr = err;
+                console.error('[PDF 리더] 합치기 페이지 실패:', name, 'p' + i, err);
+              }
+            }
+          } finally {
+            doc.destroy();
+          }
+          made += ok;
+          if (ok === 0) throw badErr || new Error('모든 페이지 렌더링 실패');
+          if (bad > 0) failures.push({ name, reason: bad + '개 페이지 렌더링 실패 (' + humanizeExportError(badErr) + ')' });
+        } else {
+          const d = await imageDims(it.file);
+          const image = await embedImage(out, it.file);
+          addImagePage(out, image, d.w, d.h);
+          made++;
+        }
+      } catch (err) {
+        failed++;
+        failures.push({ name, reason: humanizeExportError(err) });
+        console.error('[PDF 리더] 합치기 실패:', name, err);
+      }
+      btn.textContent = '합치며… ' + made + '페이지';
+      await tick();
+    }
+    if (!made) throw new Error('모든 파일 합치기에 실패했습니다. (첫 실패: ' + (failures[0] ? failures[0].reason : '모름') + ')');
+    const bytes = await out.save();
+    downloadBlob('merged.pdf', new Blob([bytes], { type: 'application/pdf' }));
+    btn.textContent = failed ? '✓ 완료 (' + failed + '개 파일 실패)' : '✓ 다운로드 완료';
+    if (failures.length) {
+      console.table(failures);
+      const summary = summarizeFailures(failures);
+      if (state.reading) alert(failures.length + '개 파일 합치기 실패:\n\n' + summary + '\n\n(전체 목록: F12 → 콘솔)');
+      else $('#homeMsg').textContent = '⚠ ' + failures.length + '개 파일 실패 — ' + summary.replace(/\n/g, ' | ');
+    }
+  } catch (err) {
+    if (failures.length) console.table(failures);
+    alert('합치기 실패: ' + (err.message || err) + '\n(실패 파일 상세: F12 → 콘솔)');
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { btn.textContent = old; }, 2500);
+  }
+}
+$('#btnExport').onclick = e => exportMerged(e.currentTarget);
+$('#btnExportR').onclick = e => exportMerged(e.currentTarget);
+/* ================= PWA: 서비스 워커 등록 + 설치 버튼 ================= */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => console.log('[PDF 리더] 서비스 워커 등록 완료 — 오프라인 사용 가능'))
+      .catch(err => console.warn('[PDF 리더] 서비스 워커 등록 실패 (file://에서는 불가, http 서버로 실행하세요):', err));
+  });
+}
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  const b = document.createElement('button');
+  b.className = 'btn';
+  b.style.marginTop = '12px';
+  b.textContent = '⬇ 앱으로 설치 (설치 후 오프라인 사용)';
+  const row = document.createElement('div');
+  row.appendChild(b);
+  $('#dropzone').after(row);
+  b.onclick = async () => {
+    e.prompt();
+    const choice = await e.userChoice;
+    if (choice.outcome === 'accepted') {
+      row.remove();
+    } else {
+      b.textContent = '⬇ 앱으로 설치 (다시 누를 수 있어요)';
+    }
+  };
+});
+</script>
+</body>
+</html>
