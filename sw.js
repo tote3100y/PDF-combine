@@ -1,8 +1,7 @@
 /* PDF 가로 스크롤 리더 — 서비스 워커 (오프라인 캐시) */
-const CACHE = 'pdf-scroller-v1';
+const CACHE = 'pdf-scroller-v2';
 const ASSETS = [
   './',
-  './index.html',
   './manifest.webmanifest',
   './lib/pdf.min.js',
   './lib/pdf.worker.min.js',
@@ -30,14 +29,15 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const req = e.request;
-  /* 페이지(내비게이션): 네트워크 우선, 오프라인이면 캐시 */
-  if (req.mode === 'navigate') {
+  const url = new URL(req.url);
+  /* 인덱스 페이지(내비게이션): 네트워크 우선 → 앱 업데이트가 항상 반영됨, 오프라인이면 캐시 */
+  if (req.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname === '/') {
     e.respondWith(
       fetch(req).catch(() => caches.match('./index.html'))
     );
     return;
   }
-  /* 나머지 리소스: 캐시 우선 (없으면 네트워크 + 캐시 저장) */
+  /* 나머지 리소스(라이브러리·아이콘 등): 캐시 우선 (없으면 네트워크 + 캐시 저장) */
   e.respondWith(
     caches.match(req).then(cached => {
       if (cached) return cached;

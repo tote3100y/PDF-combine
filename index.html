@@ -84,8 +84,8 @@
     background-size: 200% 100%; animation: shim 1.4s linear infinite; }
   @keyframes shim { to { background-position: -200% 0; } }
   .slot.error { display: flex; align-items: center; justify-content: center;
-    color: #ff8484; font-size: 14px; background: #141018; }
-  .slot.error::after { content: "⚠ 이 페이지 로드 실패"; }
+    background: #141018; }
+  .errtext { font-size: 14px; color: var(--warn); text-align: center; padding: 20px; }
   .slot canvas { width: 100%; height: 100%; display: block; }
   .plabel { position: absolute; top: 8px; left: 8px; font-size: 11px; letter-spacing: .02em;
     background: rgba(0,0,0,.55); color: #e8eaf0; padding: 3px 9px; border-radius: 999px;
@@ -135,17 +135,21 @@
 
   <div id="startRow" class="btnrow hidden">
     <button id="btnStart" class="btn primary big">▶ 읽기 시작</button>
-    <button id="btnExport" class="btn big" title="모든 페이지를 하나의 PDF로 (페이지 이미지 변환 방식 — 독서 화면과 동일한 표시)">⬇ 하나로 합친 PDF 받기</button>
+    <button id="btnExport" class="btn big" title="PDF 파일만 하나의 PDF로 (페이지 이미지 방식 — 독서 화면과 동일한 표시)">⬇ PDF 합치기 (PDF만)</button>
+    <button id="btnPhotosZip" class="btn big" title="사진(이미지)을 zip으로 — 합치지 않고 원본 파일 그대로 보관">📷 사진 zip (사진만)</button>
   </div>
-  <div class="sub" style="margin-top:8px; font-size:12px">※ 합친 PDF는 각 페이지를 이미지로 변환해 만들어요 — 독서 화면과 똑같이 표시되지만, 텍스트 선택/복사는 불가하고 용량이 커질 수 있어요</div>
+  <div class="sub" style="margin-top:8px; font-size:12px">※ <b>PDF 합치기</b>: PDF만 하나의 PDF로 (페이지 이미지 방식, 텍스트 복사 불가) &nbsp;/&nbsp; <b>사진 zip</b>: 사진은 합치지 않고 원본 파일 그대로 압축</div>
   <div id="homeMsg" class="msg"></div>
 
   <div class="tips">
     💡 <b>사용법</b><br>
-    1. <b>폴더 여러 개를 한꺼번에 드래그&드롭</b> (추천)하거나 📁 폴더 추가 버튼 사용 — 폴더는 <b>이름순으로 자동 정렬</b>됩니다 (숫자순: 폴더1 → 폴더2 → 폴더10), ↑↓로 미세 조정 가능<br>
+    1. <b>폴더 여러 개를 한꺼번에 드래그&드롭</b> (추천)하거나 📁 폴더 추가 버튼 사용 — 폴더는 <b>이름순으로 자동 정렬</b>됩니다 (숫자순: 폴더1 → 폴더2 → 폴더10)<br>
+    &nbsp;&nbsp;&nbsp;• 따로 추가한 사진/파일은 <b>각각 한 행씩</b> 올라와서 ↑↓로 자유롭게 순서 조정 가능 (자동 이름 정렬 적용)<br>
     &nbsp;&nbsp;&nbsp;• 각 폴더에 같은 이름 파일(예: 1.pdf, 2.pdf)이 있어도 문제없어요 — <b>폴더1 전체 → 폴더2 전체</b> 순서가 되고, 페이지 좌측 라벨에 폴더명이 표시됩니다<br>
     2. 폴더 안의 PDF·이미지는 숫자 순으로 섞여 정렬돼요: 1 → 2 → … → 10 (1.jpg, 1.pdf 같은 건 번호 → 확장자 순)<br>
-    3. 읽기 화면에서: 마우스 휠·트랙패드로 좌우 스크롤 / <b>← →</b> 방향키 / 화면 클릭(오른쪽 4/5=다음, 왼쪽 1/5=이전) / <b>+</b> <b>-</b> 키로 확대 축소
+    &nbsp;&nbsp;&nbsp;• JPG·PNG·WEBP·GIF·BMP·AVIF·HEIC·TIFF·SVG 등 다양한 이미지 지원 (브라우저에서 못 여는 형식은 그 페이지만 표시 오류 처리, 나머지는 정상 진행)<br>
+    3. 읽기 화면에서: 마우스 휠·트랙패드로 좌우 스크롤 / <b>← →</b> 방향키 / 화면 클릭(오른쪽 4/5=다음, 왼쪽 1/5=이전) / <b>+</b> <b>-</b> 키로 확대 축소<br>
+    4. <b>⬇ PDF 합치기</b>는 PDF만 하나의 PDF로 / <b>📷 사진 zip</b>은 사진을 합치지 않고 원본 그대로 압축
   </div>
 </div>
 
@@ -165,7 +169,8 @@
     <div id="zoomInfo" class="cinfo">100%</div>
     <button id="btnZoomIn" class="cbtn" title="확대 (+)">＋</button>
     <div class="sep"></div>
-    <button id="btnExportR" class="cbtn" title="모든 페이지를 하나의 PDF로 (페이지 이미지 변환 방식 — 독서 화면과 동일한 표시)">⬇ 합치기</button>
+    <button id="btnExportR" class="cbtn" title="PDF 파일만 → 하나의 PDF로">⬇ PDF</button>
+    <button id="btnPhotosZipR" class="cbtn" title="사진(이미지)만 → 원본 그대로 zip">📷 zip</button>
     <button id="btnFull" class="cbtn" title="전체화면">⛶</button>
   </div>
 </div>
@@ -176,7 +181,7 @@
 pdfjsLib.GlobalWorkerOptions.workerSrc = './lib/pdf.worker.min.js';
 
 const state = {
-  folders: [],   // {id, name, files:[{file, rel}]}  (추가 순서 = 읽기 순서)
+  entries: [],   // {id, type:'folder', name, files:[{file,rel}]} 또는 {id, type:'file', file, name}  (상단→하단 = 읽기 순서)
   pages: [],     // {kind:'pdf'|'image', ..., slot, canvas, ctx, rendered, queued, gen}
   zoom: 1,
   current: 0,
@@ -206,20 +211,32 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const tick = () => new Promise(r => setTimeout(r, 0));
 
 const isPdf = n => /\.pdf$/i.test(n);
-const isImage = n => /\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(n);
+const isImage = n => /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif|tiff?|svg|ico)$/i.test(n);
 const isMedia = n => isPdf(n) || isImage(n);
 
 /* 폴더 안 미디어 파일 숫자순 정렬 (1 → 2 → 10) */
-function sortedMedia(folder) {
-  return folder.files.filter(f => isMedia(f.file.name))
+function mediaFilesOf(files) {
+  return files.filter(f => isMedia(f.file.name))
     .sort((a, b) => a.file.name.localeCompare(b.file.name, 'ko', { numeric: true, sensitivity: 'base' }));
 }
-/* 폴더 추가 순서대로 펼쳐진 전체 미디어 목록 */
+/* 엔트리(폴더/단일 파일) → 읽기 순서 미디어 항목 목록 */
+function mediaItemsOfEntry(en) {
+  if (en.type === 'folder') {
+    return mediaFilesOf(en.files).map(f => ({
+      file: f.file, rel: f.rel, folderName: en.name,
+      prefix: en.name + '/', isPdf: isPdf(f.file.name),
+    }));
+  }
+  if (isMedia(en.file.name)) return [{
+    file: en.file, rel: en.file.name, folderName: en.name,
+    prefix: '', isPdf: isPdf(en.file.name),
+  }];
+  return [];
+}
+/* 전체 읽기 순서 미디어 목록 */
 function allMedia() {
   const out = [];
-  for (const f of state.folders)
-    for (const item of sortedMedia(f))
-      out.push({ file: item.file, rel: item.rel, folderName: f.name, isPdf: isPdf(item.file.name) });
+  for (const en of state.entries) out.push(...mediaItemsOfEntry(en));
   return out;
 }
 function downloadBlob(name, blob) {
@@ -297,35 +314,49 @@ $('#folderInput').addEventListener('change', e => {
 });
 
 $('#fileInput').addEventListener('change', e => {
-  const fs = [...e.target.files].map(f => ({ file: f, rel: f.name }));
-  if (fs.length) addFolder('(단독 파일)', fs);
+  const fs = [...e.target.files];
+  if (fs.length) addFiles(fs);
   e.target.value = '';
 });
 
-/* 추가 순서 대신 폴더명 숫자순(폴더1 → 폴더2 → 폴더10)으로 자동 삽입 */
+/* 추가 순서 대신 이름 숫자순(1 → 2 → 10)으로 자동 삽입 */
 function cmpFolderName(a, b) {
   return a.localeCompare(b, 'ko', { numeric: true, sensitivity: 'base' });
 }
+function autoInsert(entry) {
+  if (state.autoSort) {
+    let idx = state.entries.length;
+    for (let i = 0; i < state.entries.length; i++) {
+      if (cmpFolderName(state.entries[i].name, entry.name) > 0) { idx = i; break; }
+    }
+    state.entries.splice(idx, 0, entry);
+  } else {
+    state.entries.push(entry);
+  }
+}
 function addFolder(name, files) {
-  const ex = state.folders.find(f => f.name === name);
+  const ex = state.entries.find(e => e.type === 'folder' && e.name === name);
   if (ex) {
     for (const f of files) if (!ex.files.some(x => x.rel === f.rel)) ex.files.push(f);
   } else {
-    const entry = { id: ++state.folderSeq, name, files };
-    if (state.autoSort) {
-      let idx = state.folders.length;
-      for (let i = 0; i < state.folders.length; i++) {
-        if (cmpFolderName(state.folders[i].name, name) > 0) { idx = i; break; }
-      }
-      state.folders.splice(idx, 0, entry);
-    } else {
-      state.folders.push(entry);
-    }
+    autoInsert({ id: ++state.folderSeq, type: 'folder', name, files });
   }
   renderFolderList();
 }
+/* 개별 파일들 → 각각 독립된 행으로 추가 (중복 제외) */
+function addFiles(fileObjs) {
+  let added = 0;
+  for (const file of fileObjs) {
+    if (!isMedia(file.name)) continue;
+    const key = file.name + '|' + file.size;
+    if (state.entries.some(e => e.type === 'file' && e.key === key)) continue;
+    autoInsert({ id: ++state.folderSeq, type: 'file', key, file, name: file.name });
+    added++;
+  }
+  if (added) renderFolderList();
+}
 function resortByname() {
-  state.folders.sort((a, b) => cmpFolderName(a.name, b.name));
+  state.entries.sort((a, b) => cmpFolderName(a.name, b.name));
   state.autoSort = true;
   renderFolderList();
 }
@@ -376,11 +407,11 @@ window.addEventListener('drop', async e => {
           else emptyNames.push(h.name);
         } else if (h.kind === 'file') {
           const file = await h.getFile();
-          if (isMedia(file.name)) loose.push({ file, rel: file.name });
+          if (isMedia(file.name)) loose.push(file);
           else skipped.push(file.name);
         }
       }
-      if (loose.length) addFolder('(단독 파일)', loose);
+      if (loose.length) addFiles(loose);
       if (emptyNames.length) msg.textContent = '⚠ "' + emptyNames.join('", "') + '": 파일 0개 폴더예요.';
       else if (skipped.length) msg.textContent = 'ℹ PDF/이미지가 아닌 파일은 무시했어요: ' + skipped.join(', ');
       else if (added || loose.length) msg.textContent = '✅ ' + (added ? added + '개 폴더, ' : '') + (loose.length ? loose.length + '개 파일' : '') + ' 로딩 완료.';
@@ -394,7 +425,7 @@ window.addEventListener('drop', async e => {
       if (en) entries.push(en);
     }
     if (entries.length) {
-      const { groups, skipped } = await collectFromEntries(entries);
+      const { groups, skipped, loose } = await collectFromEntries(entries);
       console.log('[PDF 리더] 드롭 엔트리(레거시):', entries.length, '개, 무시된 파일:', skipped);
       const shortcutNames = skipped.filter(n => /\.(lnk|url|webloc|alias|desktop)$/i.test(n));
       if (shortcutNames.length) {
@@ -406,6 +437,7 @@ window.addEventListener('drop', async e => {
         if (!g.files.length) { emptyNames.push(g.name); continue; }
         addFolder(g.name, g.files);
       }
+      if (loose.length) addFiles(loose);
       if (emptyNames.length) {
         msg.textContent = '⚠ "' + emptyNames.join('", "') + '": 내용(파일 0개)을 읽지 못했어요. "📁 폴더 추가" 버튼으로 넣어주세요. 그래도 안 되면 F12 → 콘솔의 [PDF 리더] 로그를 캡처해서 알려주세요.';
       } else if (skipped.length) {
@@ -413,8 +445,8 @@ window.addEventListener('drop', async e => {
       }
     } else {
       const all = [...e.dataTransfer.files];
-      const fs = all.filter(f => isMedia(f.name)).map(f => ({ file: f, rel: f.name }));
-      if (fs.length) addFolder('(단독 파일)', fs);
+      const fs = all.filter(f => isMedia(f.name));
+      if (fs.length) addFiles(fs);
       else if (all.length) msg.textContent = '드롭한 파일은 PDF/이미지가 아니에요.';
     }
   } catch (err) {
@@ -460,10 +492,11 @@ async function walkDir(dir, prefix, out) {
 async function collectFromEntries(entries) {
   const result = [];
   const skipped = [];
+  const loose = [];
   for (const en of entries) {
     if (en.isFile) {
       const file = await new Promise((res, rej) => en.file(res, rej));
-      if (isMedia(file.name)) result.push({ name: '(단독 파일)', files: [{ file, rel: file.name }] });
+      if (isMedia(file.name)) loose.push(file);
       else skipped.push(file.name);
     } else if (en.isDirectory) {
       const files = [];
@@ -476,48 +509,62 @@ async function collectFromEntries(entries) {
     const m = merged.find(x => x.name === g.name);
     if (m) m.files.push(...g.files); else merged.push(g);
   }
-  return { groups: merged, skipped };
+  return { groups: merged, skipped, loose };
 }
 
 /* ================= 폴더 목록 UI ================= */
+function fmtSize(n) {
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+  if (n >= 1024) return (n / 1024).toFixed(0) + ' KB';
+  return n + ' B';
+}
 function renderFolderList() {
   const el = $('#folderList');
   $('#sortNote').textContent = state.autoSort
-    ? '🔁 새 폴더는 이름순(숫자순: 폴더1 → 폴더2 → 폴더10)으로 자동 정렬돼요 · ↑↓로 수동 조정 시 수동 모드로 전환'
+    ? '🔁 폴더·단일 파일 모두 이름순(숫자순: 1 → 2 → 10)으로 자동 정렬돼요 · ↑↓로 조정 시 수동 모드로 전환'
     : '✋ 수동 모드 — "↕ 이름순 정렬" 버튼으로 다시 자동 정렬할 수 있어요';
   el.innerHTML = '';
-  if (!state.folders.length) {
-    el.innerHTML = '<div class="empty">아직 추가된 폴더가 없어요 — 폴더 여러 개를 한꺼번에 드래그&드롭하거나 버튼으로 추가하세요.</div>';
+  if (!state.entries.length) {
+    el.innerHTML = '<div class="empty">아직 추가된 항목이 없어요 — 폴더 여러 개를 한꺼번에 드래그&드롭하거나 버튼으로 추가하세요. (사진은 각각 한 행씩 들어와요)</div>';
   }
-  state.folders.forEach((f, i) => {
-    const media = sortedMedia(f);
-    const nPdf = media.filter(m => isPdf(m.file.name)).length;
-    const nImg = media.length - nPdf;
+  state.entries.forEach((en, i) => {
     const row = document.createElement('div');
     row.className = 'frow';
+    let mid;
+    if (en.type === 'folder') {
+      const media = mediaFilesOf(en.files);
+      const nPdf = media.filter(m => isPdf(m.file.name)).length;
+      const nImg = media.length - nPdf;
+      mid =
+        '<span class="fname" title="' + esc(en.name) + '">📁 ' + esc(en.name) + '</span>' +
+        '<span class="fmeta">' + nPdf + ' PDF · ' + nImg + ' 이미지 · ' + en.files.length + ' 파일</span>' +
+        (media.length ? '' : '<span class="warn">PDF/이미지 없음</span>');
+    } else {
+      const isP = isPdf(en.file.name);
+      mid =
+        '<span class="fname" title="' + esc(en.name) + '">' + (isP ? '📄 ' : '📷 ') + esc(en.name) + '</span>' +
+        '<span class="fmeta">' + (isP ? 'PDF' : '이미지') + ' · ' + fmtSize(en.file.size) + '</span>';
+    }
     row.innerHTML =
-      '<span class="fidx">' + (i + 1) + '</span>' +
-      '<span class="fname" title="' + esc(f.name) + '">' + esc(f.name) + '</span>' +
-      '<span class="fmeta">' + nPdf + ' PDF · ' + nImg + ' 이미지 · ' + f.files.length + ' 파일</span>' +
-      (media.length ? '' : '<span class="warn">PDF/이미지 없음</span>') +
+      '<span class="fidx">' + (i + 1) + '</span>' + mid +
       '<span class="fgrow">' +
         '<button class="sbtn" data-act="up" title="위로">↑</button>' +
         '<button class="sbtn" data-act="down" title="아래로">↓</button>' +
         '<button class="sbtn" data-act="del" title="삭제">✕</button>' +
       '</span>';
-    row.querySelector('[data-act=up]').onclick   = () => moveFolder(i, -1);
-    row.querySelector('[data-act=down]').onclick = () => moveFolder(i, 1);
-    row.querySelector('[data-act=del]').onclick  = () => { state.folders.splice(i, 1); renderFolderList(); };
+    row.querySelector('[data-act=up]').onclick   = () => moveEntry(i, -1);
+    row.querySelector('[data-act=down]').onclick = () => moveEntry(i, 1);
+    row.querySelector('[data-act=del]').onclick  = () => { state.entries.splice(i, 1); renderFolderList(); };
     el.appendChild(row);
   });
-  $('#startRow').classList.toggle('hidden', !state.folders.length);
+  $('#startRow').classList.toggle('hidden', !state.entries.length);
 }
-function moveFolder(i, d) {
+function moveEntry(i, d) {
   const j = i + d;
-  if (j < 0 || j >= state.folders.length) return;
+  if (j < 0 || j >= state.entries.length) return;
   state.autoSort = false; /* 수동 조정부터는 수동 모드 */
-  const [f] = state.folders.splice(i, 1);
-  state.folders.splice(j, 0, f);
+  const [en] = state.entries.splice(i, 1);
+  state.entries.splice(j, 0, en);
   renderFolderList();
 }
 renderFolderList();
@@ -544,14 +591,14 @@ $('#btnStart').addEventListener('click', async () => {
 async function buildAll(btn) {
   state.pages = [];
   let done = 0;
-  for (const f of state.folders) {
-    for (const item of sortedMedia(f)) {
+  for (const en of state.entries) {
+    for (const item of mediaItemsOfEntry(en)) {
       if (isPdf(item.file.name)) {
         let doc;
         try {
           doc = await pdfjsLib.getDocument({ data: new Uint8Array(await item.file.arrayBuffer()) }).promise;
         } catch (err) {
-          throw new Error('"' + f.name + '/' + item.file.name + '" 로딩 실패 (비밀번호가 걸린 PDF일 수 있어요)');
+          throw new Error('"' + item.prefix + item.file.name + '" 로딩 실패 (비밀번호가 걸린 PDF일 수 있어요)');
         }
         for (let i = 1; i <= doc.numPages; i++) {
           const page = await doc.getPage(i);
@@ -559,7 +606,7 @@ async function buildAll(btn) {
           state.pages.push({
             kind: 'pdf', doc, page,
             w: vp.width, h: vp.height,
-            label: f.name + '/' + item.file.name + ' · p' + i,
+            label: item.prefix + item.file.name + ' · p' + i,
             slot: null, canvas: null, ctx: null,
             rendered: false, queued: false, gen: 0,
           });
@@ -572,23 +619,35 @@ async function buildAll(btn) {
       } else {
         const url = URL.createObjectURL(item.file);
         const img = new Image();
+        let ok = false;
         try {
           await new Promise((res, rej) => {
-            img.onload = res;
+            img.onload = () => { ok = true; res(); };
             img.onerror = () => rej(new Error('이미지 로드 실패'));
             img.src = url;
           });
         } catch (err) {
-          URL.revokeObjectURL(url);
-          throw new Error('"' + f.name + '/' + item.file.name + '" ' + err.message);
+          console.warn('[PDF 리더] 이미지를 열 수 없는 파일 (이 브라우저에서 안 되는 형식?):', item.prefix + item.file.name);
         }
-        state.pages.push({
-          kind: 'image', file: item.file, url, img,
-          w: img.naturalWidth, h: img.naturalHeight,
-          label: f.name + '/' + item.file.name,
-          slot: null, canvas: null, ctx: null,
-          rendered: false, queued: false, gen: 0,
-        });
+        if (ok) {
+          state.pages.push({
+            kind: 'image', file: item.file, url, img,
+            w: img.naturalWidth, h: img.naturalHeight,
+            label: item.prefix + item.file.name,
+            slot: null, canvas: null, ctx: null,
+            rendered: false, queued: false, gen: 0,
+          });
+        } else {
+          URL.revokeObjectURL(url);
+          /* 브라우저에서 못 여는 형식(예: Chrome의 HEIC) → 오류 표시 페이지로 대체 (나머지는 계속) */
+          state.pages.push({
+            kind: 'error',
+            w: 1200, h: 1500,
+            label: item.prefix + item.file.name + ' (로드 불가 — 브라우저가 지원하지 않는 형식일 수 있어요)',
+            slot: null, canvas: null, ctx: null,
+            rendered: true, queued: false, gen: 0,
+          });
+        }
         done++;
         if (done % 10 === 0) {
           btn.textContent = '로딩 중… ' + done + '페이지';
@@ -606,12 +665,18 @@ function enterReader() {
   strip.className = 'strip';
   state.pages.forEach((p, i) => {
     const slot = document.createElement('div');
-    slot.className = 'slot loading';
+    slot.className = p.kind === 'error' ? 'slot error' : 'slot loading';
     slot.dataset.i = i;
     const cv = document.createElement('canvas');
     const label = document.createElement('div');
     label.className = 'plabel';
     label.textContent = p.label;
+    if (p.kind === 'error') {
+      const t = document.createElement('div');
+      t.className = 'errtext';
+      t.textContent = '⚠ ' + p.label;
+      slot.appendChild(t);
+    }
     slot.append(cv, label);
     p.slot = slot; p.canvas = cv; p.ctx = cv.getContext('2d');
     strip.appendChild(slot);
@@ -690,6 +755,12 @@ async function renderOne(p) {
     if (err && err.name === 'RenderingCancelledException') return;
     p.slot.classList.remove('loading');
     p.slot.classList.add('error');
+    if (!p.slot.querySelector('.errtext')) {
+      const t = document.createElement('div');
+      t.className = 'errtext';
+      t.textContent = '⚠ 이 페이지 로드 실패';
+      p.slot.appendChild(t);
+    }
   }
 }
 
@@ -903,8 +974,104 @@ function summarizeFailures(failures) {
   ).join('\n');
 }
 
+/* ---------- 최소 ZIP 생성기 (store, 무압축 — 이미지는 원래 압축되어 있어 충분) ---------- */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(u8) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function makeZip(files) {
+  const enc = new TextEncoder();
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = (((now.getFullYear() - 1980) & 0x7F) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const chunks = [];
+  const central = [];
+  let offset = 0;
+  for (const f of files) {
+    const nameBytes = enc.encode(f.name);
+    const crc = crc32(f.data);
+    const local = new Uint8Array(30 + nameBytes.length + f.data.length);
+    const dv = new DataView(local.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0x0800, true); /* UTF-8 파일명 */
+    dv.setUint16(8, 0, true);      /* store(무압축) */
+    dv.setUint16(10, dosTime, true);
+    dv.setUint16(12, dosDate, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, f.data.length, true);
+    dv.setUint32(22, f.data.length, true);
+    dv.setUint16(26, nameBytes.length, true);
+    dv.setUint16(28, 0, true);
+    local.set(nameBytes, 30);
+    local.set(f.data, 30 + nameBytes.length);
+    chunks.push(local);
+
+    const cd = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(cd.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, dosTime, true);
+    cv.setUint16(14, dosDate, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, f.data.length, true);
+    cv.setUint32(24, f.data.length, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint32(42, offset, true);
+    cd.set(nameBytes, 46);
+    central.push(cd);
+    offset += local.length;
+  }
+  const cdSize = central.reduce((a, c) => a + c.length, 0);
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, offset, true);
+  return new Blob([...chunks, ...central, eocd], { type: 'application/zip' });
+}
+
+/* 사진(이미지) → zip (합치지 않고 원본 파일 그대로, 폴더 구조 유지) */
+async function exportPhotosZip(btn) {
+  const old = btn.textContent;
+  btn.disabled = true;
+  try {
+    const list = allMedia().filter(it => !it.isPdf);
+    if (!list.length) throw new Error('사진(이미지) 파일이 없어요.');
+    const files = [];
+    for (const it of list) {
+      files.push({ name: it.prefix + it.rel, data: new Uint8Array(await it.file.arrayBuffer()) });
+      btn.textContent = '모으며… 사진 ' + files.length + '개';
+      await tick();
+    }
+    downloadBlob('photos.zip', makeZip(files));
+    btn.textContent = '✓ 다운로드 완료 (사진 ' + files.length + '개)';
+  } catch (err) {
+    alert('사진 zip 만들기 실패: ' + (err.message || err));
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { btn.textContent = old; }, 2500);
+  }
+}
+
+/* PDF 파일만 → 하나의 PDF (사진은 제외, 별도 zip) */
 async function exportMerged(btn) {
-  if (!state.folders.length) return;
+  if (!state.entries.length) return;
   const old = btn.textContent;
   btn.disabled = true;
   let made = 0, failed = 0;
@@ -917,59 +1084,52 @@ async function exportMerged(btn) {
     return pw;
   };
   try {
-    const list = allMedia();
-    if (!list.length) throw new Error('합칠 파일이 없어요.');
+    const list = allMedia().filter(it => it.isPdf);
+    if (!list.length) throw new Error('PDF 파일이 없어요 — PDF만 합쳐집니다. 사진은 "📷 사진 zip" 버튼으로 받으세요.');
     const out = await PDFLib.PDFDocument.create();
 
     for (const it of list) {
       const name = it.folderName + '/' + it.file.name;
       try {
-        if (it.isPdf) {
-          let bytes = new Uint8Array(await it.file.arrayBuffer());
-          let doc;
-          try {
-            doc = await pdfjsLib.getDocument({ data: bytes }).promise;
-          } catch (err) {
-            /* 비밀번호 PDF → 사용자에게 비밀번호 받아 재시도 (캐시 재사용) */
-            if (err.name === 'PasswordException') {
-              const pw = await askPw(it.file.name);
-              if (pw) {
-                bytes = new Uint8Array(await it.file.arrayBuffer());
-                doc = await pdfjsLib.getDocument({ data: bytes, password: pw }).promise;
-              } else throw err;
+        let bytes = new Uint8Array(await it.file.arrayBuffer());
+        let doc;
+        try {
+          doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+        } catch (err) {
+          /* 비밀번호 PDF → 사용자에게 비밀번호 받아 재시도 (캐시 재사용) */
+          if (err.name === 'PasswordException') {
+            const pw = await askPw(it.file.name);
+            if (pw) {
+              bytes = new Uint8Array(await it.file.arrayBuffer());
+              doc = await pdfjsLib.getDocument({ data: bytes, password: pw }).promise;
             } else throw err;
-          }
-          /* 페이지 단위 try/catch — 한 페이지 실패해도 다른 페이지는 유지 */
-          let ok = 0, bad = 0, badErr = null;
-          try {
-            for (let i = 1; i <= doc.numPages; i++) {
-              try {
-                const r = await renderPdfPageJpeg(doc, i);
-                const image = await out.embedJpg(r.bytes);
-                addImagePage(out, image, r.w, r.h);
-                ok++;
-              } catch (err) {
-                bad++;
-                if (!badErr) badErr = err;
-                console.error('[PDF 리더] 합치기 페이지 실패:', name, 'p' + i, err);
-              }
-            }
-          } finally {
-            doc.destroy();
-          }
-          made += ok;
-          if (ok === 0) throw badErr || new Error('모든 페이지 렌더링 실패');
-          if (bad > 0) failures.push({ name, reason: bad + '개 페이지 렌더링 실패 (' + humanizeExportError(badErr) + ')' });
-        } else {
-          const d = await imageDims(it.file);
-          const image = await embedImage(out, it.file);
-          addImagePage(out, image, d.w, d.h);
-          made++;
+          } else throw err;
         }
+        /* 페이지 단위 try/catch — 한 페이지 실패해도 다른 페이지는 유지 */
+        let ok = 0, bad = 0, badErr = null;
+        try {
+          for (let i = 1; i <= doc.numPages; i++) {
+            try {
+              const r = await renderPdfPageJpeg(doc, i);
+              const image = await out.embedJpg(r.bytes);
+              addImagePage(out, image, r.w, r.h);
+              ok++;
+            } catch (err) {
+              bad++;
+              if (!badErr) badErr = err;
+              console.error('[PDF 리더] PDF 합치기 페이지 실패:', name, 'p' + i, err);
+            }
+          }
+        } finally {
+          doc.destroy();
+        }
+        made += ok;
+        if (ok === 0) throw badErr || new Error('모든 페이지 렌더링 실패');
+        if (bad > 0) failures.push({ name, reason: bad + '개 페이지 렌더링 실패 (' + humanizeExportError(badErr) + ')' });
       } catch (err) {
         failed++;
         failures.push({ name, reason: humanizeExportError(err) });
-        console.error('[PDF 리더] 합치기 실패:', name, err);
+        console.error('[PDF 리더] PDF 합치기 실패:', name, err);
       }
       btn.textContent = '합치며… ' + made + '페이지';
       await tick();
@@ -986,7 +1146,7 @@ async function exportMerged(btn) {
     }
   } catch (err) {
     if (failures.length) console.table(failures);
-    alert('합치기 실패: ' + (err.message || err) + '\n(실패 파일 상세: F12 → 콘솔)');
+    alert('PDF 합치기 실패: ' + (err.message || err) + '\n(실패 파일 상세: F12 → 콘솔)');
   } finally {
     btn.disabled = false;
     setTimeout(() => { btn.textContent = old; }, 2500);
@@ -994,6 +1154,8 @@ async function exportMerged(btn) {
 }
 $('#btnExport').onclick = e => exportMerged(e.currentTarget);
 $('#btnExportR').onclick = e => exportMerged(e.currentTarget);
+$('#btnPhotosZip').onclick = e => exportPhotosZip(e.currentTarget);
+$('#btnPhotosZipR').onclick = e => exportPhotosZip(e.currentTarget);
 /* ================= PWA: 서비스 워커 등록 + 설치 버튼 ================= */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
