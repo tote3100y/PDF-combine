@@ -61,6 +61,8 @@
   .fidx { width: 26px; height: 26px; border-radius: 8px; background: var(--panel2); flex: none;
     display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: var(--accent2); }
   .fname { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; flex: none;
+    border: 1px solid var(--border); background: #000; }
   .fmeta { color: var(--sub); font-size: 13px; white-space: nowrap; }
   .warn { color: var(--warn); font-size: 12px; white-space: nowrap; }
   .fgrow { display: flex; gap: 4px; }
@@ -541,7 +543,11 @@ function renderFolderList() {
         (media.length ? '' : '<span class="warn">PDF/이미지 없음</span>');
     } else {
       const isP = isPdf(en.file.name);
+      if (!isP && !en.thumbUrl) {
+        try { en.thumbUrl = URL.createObjectURL(en.file); } catch (e) {}
+      }
       mid =
+        (isP ? '' : (en.thumbUrl ? '<img class="thumb" src="' + en.thumbUrl + '" alt="" onerror="this.style.display=\'none\'">' : '')) +
         '<span class="fname" title="' + esc(en.name) + '">' + (isP ? '📄 ' : '📷 ') + esc(en.name) + '</span>' +
         '<span class="fmeta">' + (isP ? 'PDF' : '이미지') + ' · ' + fmtSize(en.file.size) + '</span>';
     }
@@ -554,7 +560,10 @@ function renderFolderList() {
       '</span>';
     row.querySelector('[data-act=up]').onclick   = () => moveEntry(i, -1);
     row.querySelector('[data-act=down]').onclick = () => moveEntry(i, 1);
-    row.querySelector('[data-act=del]').onclick  = () => { state.entries.splice(i, 1); renderFolderList(); };
+    row.querySelector('[data-act=del]').onclick  = () => {
+      if (en.thumbUrl) { URL.revokeObjectURL(en.thumbUrl); en.thumbUrl = null; }
+      state.entries.splice(i, 1); renderFolderList();
+    };
     el.appendChild(row);
   });
   $('#startRow').classList.toggle('hidden', !state.entries.length);
