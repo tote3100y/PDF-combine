@@ -139,8 +139,9 @@
     <button id="btnStart" class="btn primary big">▶ 읽기 시작</button>
     <button id="btnExport" class="btn big" title="PDF 파일만 하나의 PDF로 (페이지 이미지 방식 — 독서 화면과 동일한 표시)">⬇ PDF 합치기 (PDF만)</button>
     <button id="btnPhotosZip" class="btn big" title="사진(이미지)을 zip으로 — 합치지 않고 원본 파일 그대로 보관">📷 사진 zip (사진만)</button>
+    <button id="btnPhotosPdf" class="btn big" title="사진을 PDF로 변환 — 각 사진 1페이지씩, 목록 순서 유지">📷 사진 → PDF</button>
   </div>
-  <div class="sub" style="margin-top:8px; font-size:12px">※ <b>PDF 합치기</b>: PDF만 하나의 PDF로 (페이지 이미지 방식, 텍스트 복사 불가) &nbsp;/&nbsp; <b>사진 zip</b>: 사진은 합치지 않고 원본 파일 그대로 압축</div>
+  <div class="sub" style="margin-top:8px; font-size:12px">※ <b>PDF 합치기</b>: PDF만 → 1개 PDF (이미지 방식) &nbsp;/&nbsp; <b>사진 zip</b>: 사진 원본 그대로 압축 &nbsp;/&nbsp; <b>사진 → PDF</b>: 사진 각 1페이지씩 PDF 변환</div>
   <div id="homeMsg" class="msg"></div>
 
   <div class="tips">
@@ -151,7 +152,7 @@
     2. 폴더 안의 PDF·이미지는 숫자 순으로 섞여 정렬돼요: 1 → 2 → … → 10 (1.jpg, 1.pdf 같은 건 번호 → 확장자 순)<br>
     &nbsp;&nbsp;&nbsp;• JPG·PNG·WEBP·GIF·BMP·AVIF·HEIC·TIFF·SVG 등 다양한 이미지 지원 (브라우저에서 못 여는 형식은 그 페이지만 표시 오류 처리, 나머지는 정상 진행)<br>
     3. 읽기 화면에서: 마우스 휠·트랙패드로 좌우 스크롤 / <b>← →</b> 방향키 / 화면 클릭(오른쪽 4/5=다음, 왼쪽 1/5=이전) / <b>+</b> <b>-</b> 키로 확대 축소<br>
-    4. <b>⬇ PDF 합치기</b>는 PDF만 하나의 PDF로 / <b>📷 사진 zip</b>은 사진을 합치지 않고 원본 그대로 압축
+    4. 내보내기: <b>⬇ PDF 합치기</b>=PDF만 → 1개 PDF / <b>📷 사진 zip</b>=사진 원본 그대로 압축 / <b>📷 사진 → PDF</b>=사진 각 1페이지씩 PDF 변환
   </div>
 </div>
 
@@ -173,6 +174,7 @@
     <div class="sep"></div>
     <button id="btnExportR" class="cbtn" title="PDF 파일만 → 하나의 PDF로">⬇ PDF</button>
     <button id="btnPhotosZipR" class="cbtn" title="사진(이미지)만 → 원본 그대로 zip">📷 zip</button>
+    <button id="btnPhotosPdfR" class="cbtn" title="사진만 → PDF로 변환 (각 1페이지)">📷 PDF</button>
     <button id="btnFull" class="cbtn" title="전체화면">⛶</button>
   </div>
 </div>
@@ -1078,6 +1080,49 @@ async function exportPhotosZip(btn) {
   }
 }
 
+/* 사진(이미지) → PDF (각 사진 1페이지, 목록 순서 유지, 원본 품질 유지) */
+async function exportPhotosPdf(btn) {
+  const old = btn.textContent;
+  btn.disabled = true;
+  let made = 0, failed = 0;
+  const failures = [];
+  try {
+    const list = allMedia().filter(it => !it.isPdf);
+    if (!list.length) throw new Error('사진(이미지) 파일이 없어요.');
+    const out = await PDFLib.PDFDocument.create();
+    for (const it of list) {
+      const name = it.prefix + it.file.name;
+      try {
+        const d = await imageDims(it.file);
+        const image = await embedImage(out, it.file);
+        addImagePage(out, image, d.w, d.h);
+        made++;
+      } catch (err) {
+        failed++;
+        failures.push({ name, reason: humanizeExportError(err) });
+        console.error('[PDF 리더] 사진→PDF 실패:', name, err);
+      }
+      btn.textContent = '변환 중… ' + made + '장';
+      await tick();
+    }
+    if (!made) throw new Error('모든 사진 변환에 실패했습니다. (첫 실패: ' + (failures[0] ? failures[0].reason : '모름') + ')');
+    const bytes = await out.save();
+    downloadBlob('photos.pdf', new Blob([bytes], { type: 'application/pdf' }));
+    btn.textContent = failed ? '✓ 완료 (' + failed + '개 실패)' : '✓ 다운로드 완료';
+    if (failures.length) {
+      console.table(failures);
+      const summary = summarizeFailures(failures);
+      if (state.reading) alert(failures.length + '개 사진 변환 실패:\n\n' + summary + '\n\n(전체 목록: F12 → 콘솔)');
+      else $('#homeMsg').textContent = '⚠ ' + failures.length + '개 사진 실패 — ' + summary.replace(/\n/g, ' | ');
+    }
+  } catch (err) {
+    alert('사진 → PDF 실패: ' + (err.message || err) + '\n(상세: F12 → 콘솔)');
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { btn.textContent = old; }, 2500);
+  }
+}
+
 /* PDF 파일만 → 하나의 PDF (사진은 제외, 별도 zip) */
 async function exportMerged(btn) {
   if (!state.entries.length) return;
@@ -1165,6 +1210,8 @@ $('#btnExport').onclick = e => exportMerged(e.currentTarget);
 $('#btnExportR').onclick = e => exportMerged(e.currentTarget);
 $('#btnPhotosZip').onclick = e => exportPhotosZip(e.currentTarget);
 $('#btnPhotosZipR').onclick = e => exportPhotosZip(e.currentTarget);
+$('#btnPhotosPdf').onclick = e => exportPhotosPdf(e.currentTarget);
+$('#btnPhotosPdfR').onclick = e => exportPhotosPdf(e.currentTarget);
 /* ================= PWA: 서비스 워커 등록 + 설치 버튼 ================= */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
