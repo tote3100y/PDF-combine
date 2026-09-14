@@ -1,11 +1,14 @@
 /* PDF 가로 스크롤 리더 — 서비스 워커 (오프라인 캐시) */
-const CACHE = 'pdf-scroller-v2';
+const CACHE = 'pdf-scroller-v4';
 const ASSETS = [
   './',
   './manifest.webmanifest',
   './lib/pdf.min.js',
   './lib/pdf.worker.min.js',
   './lib/pdf-lib.js',
+  './lib/heic2any.min.js',
+  './lib/pako.min.js',
+  './lib/UTIF.js',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',

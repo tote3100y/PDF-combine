@@ -19,8 +19,8 @@ PDF 가로 스크롤 리더 — 사용법
        텍스트 선택/복사는 불가합니다.
    - "📷 사진 zip (사진만)" → 사진(이미지)은 합치지 않고 원본 파일 그대로,
      폴더 구조를 유지한 zip(photos.zip)으로 저장
-   ※ 지원 이미지: JPG·PNG·WEBP·GIF·BMP·AVIF·HEIC·TIFF·SVG 등
-     (브라우저에서 못 여는 형식은 독서 화면에서 그 페이지만 표시 오류 처리됩니다)
+   ※ 지원 이미지: JPG·PNG·WEBP·GIF·BMP·AVIF·HEIC·HEIF·TIFF·SVG·ICO 등 (HEIC/HEIF·TIFF는 브라우저에서 자동 변환)
+     RAW(DNG/CR2/NEF/ARW 등)는 목록과 사진 zip에는 포함되지만, 브라우저 렌더링이 불가합니다
 
 
 [실행 방법]

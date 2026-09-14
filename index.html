@@ -12,6 +12,9 @@
 <script src="./lib/pdf.min.js"></script>
 <script src="./lib/pdf.worker.min.js"></script>
 <script src="./lib/pdf-lib.js"></script>
+<script src="./lib/heic2any.min.js"></script>
+<script src="./lib/pako.min.js"></script>
+<script src="./lib/UTIF.js"></script>
 <style>
   :root, [data-theme="dark"] {
     --bg: #0e0f13; --panel: #171a21; --panel2: #1e2230;
@@ -126,7 +129,7 @@
     <button id="btnAddFolder" class="btn primary">📁 폴더 추가</button>
     <button id="btnAddFiles" class="btn">📄 PDF / 이미지 파일 추가</button>
     <input type="file" id="folderInput" webkitdirectory multiple hidden>
-    <input type="file" id="fileInput" accept="application/pdf,image/*,.pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.avif" multiple hidden>
+    <input type="file" id="fileInput" accept="application/pdf,image/*,.pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,.avif,.heic,.heif,.tif,.tiff,.svg,.ico,.dng,.cr2,.cr3,.nef,.arw,.rw2,.orf,.raf,.sr2,.pef,.kdc" multiple hidden>
   </div>
 
   <div class="sortrow">
@@ -150,7 +153,7 @@
     &nbsp;&nbsp;&nbsp;• 따로 추가한 사진/파일은 <b>각각 한 행씩</b> 올라와서 ↑↓로 자유롭게 순서 조정 가능 (자동 이름 정렬 적용)<br>
     &nbsp;&nbsp;&nbsp;• 각 폴더에 같은 이름 파일(예: 1.pdf, 2.pdf)이 있어도 문제없어요 — <b>폴더1 전체 → 폴더2 전체</b> 순서가 되고, 페이지 좌측 라벨에 폴더명이 표시됩니다<br>
     2. 폴더 안의 PDF·이미지는 숫자 순으로 섞여 정렬돼요: 1 → 2 → … → 10 (1.jpg, 1.pdf 같은 건 번호 → 확장자 순)<br>
-    &nbsp;&nbsp;&nbsp;• JPG·PNG·WEBP·GIF·BMP·AVIF·HEIC·TIFF·SVG 등 다양한 이미지 지원 (브라우저에서 못 여는 형식은 그 페이지만 표시 오류 처리, 나머지는 정상 진행)<br>
+    &nbsp;&nbsp;&nbsp;• JPG·PNG·WEBP·GIF·BMP·AVIF·HEIC·HEIF·TIFF·SVG·ICO 등 거의 모든 이미지 지원 — <b>HEIC/HEIF·TIFF는 브라우저에서 자동 변환</b>, RAW는 목록/zip에는 포함되나 렌더링은 불가<br>
     3. 읽기 화면에서: 마우스 휠·트랙패드로 좌우 스크롤 / <b>← →</b> 방향키 / 화면 클릭(오른쪽 4/5=다음, 왼쪽 1/5=이전) / <b>+</b> <b>-</b> 키로 확대 축소<br>
     4. 내보내기: <b>⬇ PDF 합치기</b>=PDF만 → 1개 PDF / <b>📷 사진 zip</b>=사진 원본 그대로 압축 / <b>📷 사진 → PDF</b>=사진 각 1페이지씩 PDF 변환
   </div>
@@ -215,7 +218,8 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const tick = () => new Promise(r => setTimeout(r, 0));
 
 const isPdf = n => /\.pdf$/i.test(n);
-const isImage = n => /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif|tiff?|svg|ico)$/i.test(n);
+const isImage = n => /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif|tiff?|svg|ico|dng|cr2|cr3|nef|arw|rw2|orf|raf|sr2|pef|kdc|mrw|x3f)$/i.test(n);
+const isRaw = n => /\.(dng|cr2|cr3|nef|arw|rw2|orf|raf|sr2|pef|kdc|mrw|x3f)$/i.test(n);
 const isMedia = n => isPdf(n) || isImage(n);
 
 /* 폴더 안 미디어 파일 숫자순 정렬 (1 → 2 → 10) */
@@ -252,9 +256,74 @@ function downloadBlob(name, blob) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
+/* 파일 헤더(magic bytes)로 실제 이미지 형식 감지 — 확장자와 다른 경우 대응 */
+async function sniffImageType(file) {
+  try {
+    const buf = new Uint8Array(await file.slice(0, 20).arrayBuffer());
+    if (buf.length < 12) return 'unknown';
+    if (buf[0] === 0xFF && buf[1] === 0xD8) return 'jpeg';
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return 'png';
+    if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return 'gif';
+    if (buf[0] === 0x42 && buf[1] === 0x4D) return 'bmp';
+    if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+        buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return 'webp';
+    /* ftyp 박스 (HEIC/HEIF/AVIF): 4바이트 오프셋에 'ftyp' */
+    if (buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) {
+      const brands = String.fromCharCode(...buf.slice(8, 20));
+      if (/(avif|avis)/.test(brands)) return 'avif';
+      if (/(heic|heix|hevc|hevx|hevm|hevs|mif1|msf1|crx)/.test(brands)) return 'heic';
+      return 'ftyp-unknown';
+    }
+    /* TIFF: 'II*\0' (little-endian) 또는 'MM\0*' (big-endian) */
+    if (buf[0] === 0x49 && buf[1] === 0x49 && buf[2] === 0x2A && buf[3] === 0x00) return 'tiff';
+    if (buf[0] === 0x4D && buf[1] === 0x4D && buf[2] === 0x00 && buf[3] === 0x2A) return 'tiff';
+    return 'unknown';
+  } catch (e) {
+    return 'unknown';
+  }
+}
+
+/* 브라우저가 직접 못 여는 파일 →_decodable Blob으로 변환
+   HEIC/HEIF → JPEG (heic2any) · TIFF → PNG (UTIF, 첫 페이지) · 그 외 → null */
+async function convertToViewable(file) {
+  const n = (file.name || '').toLowerCase();
+  let type = 'unknown';
+  try { type = await sniffImageType(file); } catch (e) {}
+  /* HEIC/HEIF → JPEG */
+  if (type === 'heic' || n.endsWith('.heic') || n.endsWith('.heif')) {
+    if (typeof heic2any === 'function') {
+      try {
+        const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+        if (out && out.size) return out;
+      } catch (e) { console.warn('[PDF 리더] HEIC/HEIF 변환 실패:', e); }
+    }
+    return null;
+  }
+  /* TIFF → PNG (첫 페이지) */
+  if (type === 'tiff' || n.endsWith('.tif') || n.endsWith('.tiff')) {
+    if (typeof UTIF === 'object' && UTIF.decode) {
+      try {
+        const data = new Uint8Array(await file.arrayBuffer());
+        const ifds = UTIF.decode(data);
+        if (!ifds || !ifds.length) return null;
+        UTIF.decodeImage(data, ifds[0]);
+        const rgba = UTIF.toRGBA8(ifds[0]);
+        const cv = document.createElement('canvas');
+        cv.width = ifds[0].width;
+        cv.height = ifds[0].height;
+        const id = cv.getContext('2d').createImageData(cv.width, cv.height);
+        id.data.set(rgba);
+        cv.getContext('2d').putImageData(id, 0, 0);
+        return await new Promise(res => cv.toBlob(res, 'image/png'));
+      } catch (e) { console.warn('[PDF 리더] TIFF 변환 실패:', e); }
+    }
+    return null;
+  }
+  return null;
+}
+
 /* 이미지 원본 크기(픽셀)만 빠르게 얻기 */
-function imageDims(file) {
-  return new Promise((res, rej) => {
+function imageDims(file) {  return new Promise((res, rej) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     let done = false;
@@ -628,7 +697,10 @@ async function buildAll(btn) {
           }
         }
       } else {
-        const url = URL.createObjectURL(item.file);
+        let conv = null;
+        try { conv = await convertToViewable(item.file); }
+        catch (e) { console.warn('[PDF 리더] 형식 변환 실패:', item.prefix + item.file.name, e); }
+        const url = URL.createObjectURL(conv || item.file);
         const img = new Image();
         let ok = false;
         try {
@@ -916,12 +988,19 @@ const MERGE_PX = 1600;    /* 렌더링 목표: 긴 변 (px) */
 const MERGE_PT_H = 842;   /* 세로 페이지 목표 높이 (pt, A4) */
 const MERGE_PT_W = 1190;  /* 가로 페이지 목표 너비 (pt, A4) */
 
-async function embedImage(doc, file) {
-  const name = file.name.toLowerCase();
+/* 실제 형식 기반으로 임베드 (확장자 사기 방지) — 실패 시 캔버스→PNG 폴백 */
+async function embedImage(doc, file, hintType) {
+  const type = hintType || await sniffImageType(file);
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return doc.embedJpg(bytes);
-  if (name.endsWith('.png')) return doc.embedPng(bytes);
-  /* webp·gif·bmp 등 → canvas로 PNG 변환 */
+  if (type === 'jpeg') {
+    try { return await doc.embedJpg(bytes); }
+    catch (e) { console.warn('[PDF 리더] embedJpg 실패(CMYK 등) → 캔버스 변환:', e); }
+  }
+  if (type === 'png') {
+    try { return await doc.embedPng(bytes); }
+    catch (e) { console.warn('[PDF 리더] embedPng 실패 → 캔버스 변환:', e); }
+  }
+  /* webp·gif·bmp·avif·tiff 등 → canvas로 PNG 변환 */
   const bmp = await createImageBitmap(file);
   const cv = document.createElement('canvas');
   cv.width = bmp.width;
@@ -929,7 +1008,8 @@ async function embedImage(doc, file) {
   cv.getContext('2d').drawImage(bmp, 0, 0);
   if (bmp.close) bmp.close();
   const b64 = cv.toDataURL('image/png').split(',')[1];
-  return doc.embedPng(atob(b64));
+  /* pdf-lib은 base64 문자열 또는 Uint8Array를 받지만 atob() binary 문자열은 불가 */
+  return doc.embedPng(b64);
 }
 
 /* pdf.js 페이지 → JPEG 바이너리 (흰 배경 채움) */
@@ -968,7 +1048,9 @@ function humanizeExportError(err) {
   if (err.name === 'PasswordException') return '비밀번호 걸린 PDF';
   const m = String(err.message || err);
   if (m.includes('이미지 로드 실패') || m.includes('이미지 로드 시간 초과'))
-    return '이미지 로드 실패 (HEIC 등 브라우저가 못 여는 형식일 수 있어요)';
+    return '이미지 로드 실패 (브라우저가 못 여는 형식일 수 있어요)';
+  if (/createImageBitmap|corrupted|unsupported/i.test(m))
+    return '브라우저가 이 형식을 못 열어요 (확장자와 실제 내용이 다를 수 있어요)';
   if (/password/i.test(m)) return '비밀번호 걸린 PDF';
   return m.length > 50 ? m.slice(0, 50) + '…' : m;
 }
@@ -1093,14 +1175,21 @@ async function exportPhotosPdf(btn) {
     for (const it of list) {
       const name = it.prefix + it.file.name;
       try {
-        const d = await imageDims(it.file);
-        const image = await embedImage(out, it.file);
+        const conv = await convertToViewable(it.file);
+        const src = conv || it.file;
+        const d = await imageDims(src);
+        const image = await embedImage(out, src);
         addImagePage(out, image, d.w, d.h);
         made++;
       } catch (err) {
         failed++;
-        failures.push({ name, reason: humanizeExportError(err) });
-        console.error('[PDF 리더] 사진→PDF 실패:', name, err);
+        let type = '';
+        try { type = await sniffImageType(it.file); } catch (e) {}
+        let reason;
+        if (isRaw(it.file.name)) reason = 'RAW 카메라 형식 — 브라우저 렌더링 불가 (JPG 변환 권장)';
+        else reason = (type !== 'unknown' ? '(실제 형식: ' + type + ') ' : '') + humanizeExportError(err);
+        failures.push({ name, reason });
+        console.error('[PDF 리더] 사진→PDF 실패:', name, type, err);
       }
       btn.textContent = '변환 중… ' + made + '장';
       await tick();
